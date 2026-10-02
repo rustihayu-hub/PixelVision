@@ -4,8 +4,27 @@ import ModuleViewer from './components/ModuleViewer';
 import InteractiveLab from './components/InteractiveLab';
 import QuizEngine from './components/QuizEngine';
 import AchievementView from './components/AchievementView';
-import { Layout, BookOpen, Layers, Award, HelpCircle, Eye, ChevronRight, Menu, X, Sparkles } from 'lucide-react';
+import { Layout, BookOpen, Layers, Award, HelpCircle, Menu, X } from 'lucide-react';
 import './App.css';
+
+// Safe LocalStorage helpers
+const getSafeLocalStorage = (key, fallback) => {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch (e) {
+    console.warn(`Error reading ${key} from LocalStorage:`, e);
+    return fallback;
+  }
+};
+
+const setSafeLocalStorage = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.warn(`Error writing ${key} to LocalStorage:`, e);
+  }
+};
 
 function App() {
   // Navigation View State: 'home' | 'module' | 'lab' | 'quiz' | 'achievement'
@@ -13,23 +32,21 @@ function App() {
   const [selectedModuleId, setSelectedModuleId] = useState('histogram');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Persistent user state in LocalStorage
-  const [completedModules, setCompletedModules] = useState(() => {
-    const saved = localStorage.getItem('pixelvision_completed_modules');
-    return saved ? JSON.parse(saved) : [];
-  });
+  // Persistent user state in LocalStorage with safe fallbacks
+  const [completedModules, setCompletedModules] = useState(() => 
+    getSafeLocalStorage('pixelvision_completed_modules', [])
+  );
 
-  const [quizScore, setQuizScore] = useState(() => {
-    const saved = localStorage.getItem('pixelvision_quiz_score');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [quizScore, setQuizScore] = useState(() => 
+    getSafeLocalStorage('pixelvision_quiz_score', null)
+  );
 
   useEffect(() => {
-    localStorage.setItem('pixelvision_completed_modules', JSON.stringify(completedModules));
+    setSafeLocalStorage('pixelvision_completed_modules', completedModules);
   }, [completedModules]);
 
   useEffect(() => {
-    localStorage.setItem('pixelvision_quiz_score', JSON.stringify(quizScore));
+    setSafeLocalStorage('pixelvision_quiz_score', quizScore);
   }, [quizScore]);
 
   const handleSelectModule = (modId) => {
@@ -45,7 +62,7 @@ function App() {
   };
 
   const handleCompleteModule = (modId) => {
-    if (!completedModules.includes(modId)) {
+    if (Array.isArray(completedModules) && !completedModules.includes(modId)) {
       setCompletedModules(prev => [...prev, modId]);
     }
   };
@@ -58,13 +75,17 @@ function App() {
     if (window.confirm('Apakah Anda yakin ingin mereset seluruh progress pembelajaran?')) {
       setCompletedModules([]);
       setQuizScore(null);
-      localStorage.removeItem('pixelvision_completed_modules');
-      localStorage.removeItem('pixelvision_quiz_score');
+      try {
+        localStorage.removeItem('pixelvision_completed_modules');
+        localStorage.removeItem('pixelvision_quiz_score');
+      } catch (e) {
+        console.warn('Error clearing LocalStorage', e);
+      }
     }
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="app-container">
       
       {/* Top Navbar */}
       <header className="glass-panel" style={{
@@ -79,14 +100,14 @@ function App() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        background: 'rgba(11, 15, 25, 0.85)'
+        background: 'rgba(11, 15, 25, 0.9)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="btn-secondary"
             style={{ padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            aria-label="Toggle Menu"
+            aria-label="Toggle Menu Navigasi"
           >
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -117,7 +138,7 @@ function App() {
         </div>
 
         {/* Desktop Navbar Links */}
-        <nav style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <nav style={{ display: 'flex', gap: '8px', alignItems: 'center' }} aria-label="Menu Utama">
           <button
             onClick={() => setCurrentView('home')}
             className={currentView === 'home' ? 'btn-primary' : 'btn-secondary'}
@@ -156,7 +177,7 @@ function App() {
         </nav>
       </header>
 
-      {/* Slide-out Navigation Drawer for Mobile/Quick Nav */}
+      {/* Slide-out Navigation Drawer */}
       {sidebarOpen && (
         <div className="glass-panel animate-fade-in" style={{
           position: 'fixed',
@@ -187,10 +208,10 @@ function App() {
               <Layers size={16} /> Image Lab Simulasi
             </button>
             <button onClick={() => { setCurrentView('quiz'); setSidebarOpen(false); }} className="btn-secondary" style={{ justifyContent: 'flex-start' }}>
-              <HelpCircle size={16} /> Evaluasi / Game Kuis
+              <HelpCircle size={16} /> Game Kuis / Evaluasi
             </button>
             <button onClick={() => { setCurrentView('achievement'); setSidebarOpen(false); }} className="btn-secondary" style={{ justifyContent: 'flex-start' }}>
-              <Award size={16} /> Skor & Achievements
+              <Award size={16} /> Skor & Pencapaian
             </button>
           </div>
         </div>
@@ -224,7 +245,7 @@ function App() {
 
         {currentView === 'achievement' && (
           <AchievementView
-            completedModules={completedModules}
+            completedModules={Array.isArray(completedModules) ? completedModules : []}
             quizScore={quizScore}
             onResetProgress={handleResetProgress}
           />

@@ -1,9 +1,10 @@
 import React from 'react';
-import { Award, CheckCircle, Clock, BookOpen, Star, RefreshCw } from 'lucide-react';
+import { Award, Clock, BookOpen, Star, RefreshCw } from 'lucide-react';
 
 export default function AchievementView({ completedModules = [], quizScore = null, onResetProgress }) {
   const totalModules = 3;
-  const progressPercent = Math.round((completedModules.length / totalModules) * 100);
+  const validModulesCount = Array.isArray(completedModules) ? completedModules.length : 0;
+  const progressPercent = Math.round((validModulesCount / totalModules) * 100);
 
   return (
     <div className="animate-fade-in" style={{ maxWidth: '900px', margin: '0 auto', paddingBottom: '60px' }}>
@@ -12,7 +13,7 @@ export default function AchievementView({ completedModules = [], quizScore = nul
       <div className="glass-panel" style={{ padding: '36px', textAlign: 'center', marginBottom: '30px' }}>
         <Award size={56} style={{ color: 'var(--primary)', marginBottom: '16px' }} />
         <h1 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '8px' }}>Pencapaian Belajar Anda</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Pantau kemajuan modul, skor kuis, serta lencana penghargaan yang berhasil diraih.</p>
+        <p style={{ color: 'var(--text-muted)' }}>Pantau kemajuan modul, skor kuis, serta lencana penghargaan yang berhasil Anda raih.</p>
         
         {/* Progress Bar */}
         <div style={{ maxWidth: '500px', margin: '24px auto 0 auto' }}>
@@ -33,9 +34,9 @@ export default function AchievementView({ completedModules = [], quizScore = nul
             <BookOpen style={{ color: 'var(--primary)' }} size={24} />
             <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Modul Tuntas</h3>
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>{completedModules.length} / {totalModules}</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>{validModulesCount} / {totalModules}</div>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            {completedModules.length === 3 ? 'Seluruh modul telah diselesaikan' : 'Selesaikan modul tersisa untuk klaim sertifikat'}
+            {validModulesCount === 3 ? 'Seluruh modul telah diselesaikan 100%' : 'Selesaikan modul tersisa untuk mencapai progress 100%'}
           </p>
         </div>
 
@@ -48,14 +49,14 @@ export default function AchievementView({ completedModules = [], quizScore = nul
             {quizScore !== null ? `${quizScore} / 100` : 'Belum Dikerjakan'}
           </div>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            {quizScore >= 70 ? 'Status: LULUS SANGAT MEMUASKAN' : 'Dapatkan skor >= 70 untuk kelulusan'}
+            {quizScore >= 70 ? 'Status: LULUS SANGAT MEMUASKAN' : 'Dapatkan skor >= 70 untuk kelulusan kuis'}
           </p>
         </div>
 
         <div className="glass-card" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
             <Clock style={{ color: 'var(--accent-purple)' }} size={24} />
-            <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Waktu Akses</h3>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Mode Belajar</h3>
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>Self-Paced</div>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px' }}>Pembelajaran mandiri interaktif</p>
@@ -70,9 +71,9 @@ export default function AchievementView({ completedModules = [], quizScore = nul
           <div style={{
             padding: '20px',
             borderRadius: '12px',
-            background: completedModules.length > 0 ? 'rgba(81, 112, 255, 0.1)' : 'rgba(255,255,255,0.02)',
-            border: completedModules.length > 0 ? '1px solid rgba(81, 112, 255, 0.3)' : '1px solid rgba(255,255,255,0.05)',
-            opacity: completedModules.length > 0 ? 1 : 0.4
+            background: validModulesCount > 0 ? 'rgba(81, 112, 255, 0.1)' : 'rgba(255,255,255,0.02)',
+            border: validModulesCount > 0 ? '1px solid rgba(81, 112, 255, 0.3)' : '1px solid rgba(255,255,255,0.05)',
+            opacity: validModulesCount > 0 ? 1 : 0.4
           }}>
             <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '4px' }}>🏅 Pixel Pioneer</div>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Menyelesaikan modul pertama pengolahan citra digital.</p>
@@ -92,9 +93,9 @@ export default function AchievementView({ completedModules = [], quizScore = nul
           <div style={{
             padding: '20px',
             borderRadius: '12px',
-            background: completedModules.length === 3 ? 'rgba(139, 92, 246, 0.1)' : 'rgba(255,255,255,0.02)',
-            border: completedModules.length === 3 ? '1px solid rgba(139, 92, 246, 0.3)' : '1px solid rgba(255,255,255,0.05)',
-            opacity: completedModules.length === 3 ? 1 : 0.4
+            background: validModulesCount === 3 ? 'rgba(139, 92, 246, 0.1)' : 'rgba(255,255,255,0.02)',
+            border: validModulesCount === 3 ? '1px solid rgba(139, 92, 246, 0.3)' : '1px solid rgba(255,255,255,0.05)',
+            opacity: validModulesCount === 3 ? 1 : 0.4
           }}>
             <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '4px' }}>⚡ Algorithm Specialist</div>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Menuntaskan 3 modul utama pengolahan citra.</p>

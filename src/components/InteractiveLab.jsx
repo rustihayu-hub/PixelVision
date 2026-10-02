@@ -1,13 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { drawSampleImage } from '../utils/imageUtils';
 import { applyHistogramEqualization, applyFilter, applyEdgeDetection } from '../utils/imageAlgorithms';
-import { RefreshCw, Upload, Image as ImageIcon, Sliders, Code, Eye, Layers } from 'lucide-react';
+import { RefreshCw, Upload, Sliders, Code, Layers, AlertCircle, Info, CheckCircle2 } from 'lucide-react';
 
 export default function InteractiveLab({ initialMode = 'histogram' }) {
   const [selectedImage, setSelectedImage] = useState('cityscape');
   const [customImageSrc, setCustomImageSrc] = useState(null);
   const [activeTab, setActiveTab] = useState(initialMode); // 'histogram' | 'filtering' | 'edge'
   
+  // Status & Error toast messaging
+  const [toastMessage, setToastMessage] = useState(null);
+  const [toastType, setToastType] = useState('info'); // 'info' | 'error' | 'success'
+  const [isProcessing, setIsProcessing] = useState(false);
+
   // Histogram controls
   const [bins, setBins] = useState(256);
   
@@ -25,77 +30,108 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
   const targetCanvasRef = useRef(null);
   const histSourceCanvasRef = useRef(null);
   const histTargetCanvasRef = useRef(null);
-
   const fileInputRef = useRef(null);
+
+  const showToast = (msg, type = 'info') => {
+    setToastMessage(msg);
+    setToastType(type);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  };
 
   // Sync activeTab when initialMode prop changes
   useEffect(() => {
     setActiveTab(initialMode);
   }, [initialMode]);
 
-  // Load and render images to canvases
+  // Load and render images with aspect ratio preservation
   useEffect(() => {
     const srcCanvas = sourceCanvasRef.current;
     const tgtCanvas = targetCanvasRef.current;
     if (!srcCanvas || !tgtCanvas) return;
 
     const srcCtx = srcCanvas.getContext('2d');
-    const tgtCtx = tgtCanvas.getContext('2d');
+    setIsProcessing(true);
 
     if (customImageSrc) {
       const img = new Image();
       img.crossOrigin = 'Anonymous';
       img.onload = () => {
-        srcCanvas.width = 400;
-        srcCanvas.height = 300;
-        tgtCanvas.width = 400;
-        tgtCanvas.height = 300;
-        srcCtx.drawImage(img, 0, 0, 400, 300);
-        processCanvasData();
+        // Maintain Aspect Ratio with max dimensions
+        const maxW = 480;
+        const maxH = 340;
+        let w = img.width;
+        let h = img.height;
+
+        if (w > maxW || h > maxH) {
+          const ratio = Math.min(maxW / w, maxH / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+
+        srcCanvas.width = w;
+        srcCanvas.height = h;
+        tgtCanvas.width = w;
+        tgtCanvas.height = h;
+
+        srcCtx.drawImage(img, 0, 0, w, h);
+        processCanvasData(w, h);
+        setIsProcessing(false);
+      };
+      img.onerror = () => {
+        showToast('Gagal memuat gambar custom. Menggunakan preset.', 'error');
+        setCustomImageSrc(null);
+        setIsProcessing(false);
       };
       img.src = customImageSrc;
     } else {
-      srcCanvas.width = 400;
-      srcCanvas.height = 300;
-      tgtCanvas.width = 400;
-      tgtCanvas.height = 300;
+      const w = 440;
+      const h = 320;
+      srcCanvas.width = w;
+      srcCanvas.height = h;
+      tgtCanvas.width = w;
+      tgtCanvas.height = h;
+
       drawSampleImage(srcCanvas, selectedImage);
-      processCanvasData();
+      processCanvasData(w, h);
+      setIsProcessing(false);
     }
   }, [selectedImage, customImageSrc, activeTab, bins, filterType, kernelSize, edgeAlgo, lowThreshold, highThreshold]);
 
-  const processCanvasData = () => {
+  const processCanvasData = (w, h) => {
     const srcCanvas = sourceCanvasRef.current;
     const tgtCanvas = targetCanvasRef.current;
     if (!srcCanvas || !tgtCanvas) return;
 
+    const width = w || srcCanvas.width;
+    const height = h || srcCanvas.height;
     const srcCtx = srcCanvas.getContext('2d');
     const tgtCtx = tgtCanvas.getContext('2d');
 
     if (activeTab === 'histogram') {
-      const targetHist = applyHistogramEqualization(srcCtx, tgtCtx, 400, 300, bins);
-      renderHistograms(srcCtx, targetHist);
+      const targetHist = applyHistogramEqualization(srcCtx, tgtCtx, width, height, bins);
+      renderHistograms(srcCtx, targetHist, width, height);
     } else if (activeTab === 'filtering') {
-      applyFilter(srcCtx, tgtCtx, 400, 300, filterType, Number(kernelSize));
+      applyFilter(srcCtx, tgtCtx, width, height, filterType, Number(kernelSize));
     } else if (activeTab === 'edge') {
-      applyEdgeDetection(srcCtx, tgtCtx, 400, 300, edgeAlgo, {
+      applyEdgeDetection(srcCtx, tgtCtx, width, height, edgeAlgo, {
         lowThreshold: Number(lowThreshold),
         highThreshold: Number(highThreshold)
       });
     }
   };
 
-  const renderHistograms = (srcCtx, targetHistData) => {
+  const renderHistograms = (srcCtx, targetHistData, width, height) => {
     if (!histSourceCanvasRef.current || !histTargetCanvasRef.current) return;
 
-    // Draw Source Histogram
-    const srcHistData = getRawHistogramData(srcCtx);
+    const srcHistData = getRawHistogramData(srcCtx, width, height);
     drawHistogramChart(histSourceCanvasRef.current, srcHistData, '#5170FF');
     drawHistogramChart(histTargetCanvasRef.current, targetHistData, '#22c55e');
   };
 
-  const getRawHistogramData = (ctx) => {
-    const imgData = ctx.getImageData(0, 0, 400, 300);
+  const getRawHistogramData = (ctx, width, height) => {
+    const imgData = ctx.getImageData(0, 0, width, height);
     const data = imgData.data;
     const hist = new Array(256).fill(0);
     for (let i = 0; i < data.length; i += 4) {
@@ -108,30 +144,42 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
   const drawHistogramChart = (canvas, histData, color) => {
     if (!canvas || !histData) return;
     canvas.width = 380;
-    canvas.height = 120;
+    canvas.height = 110;
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, 380, 120);
+    ctx.clearRect(0, 0, 380, 110);
 
     const maxVal = Math.max(...histData, 1);
     const barWidth = 380 / histData.length;
 
     ctx.fillStyle = color;
     for (let i = 0; i < histData.length; i++) {
-      const h = (histData[i] / maxVal) * 110;
-      ctx.fillRect(i * barWidth, 120 - h, barWidth, h);
+      const h = (histData[i] / maxVal) * 100;
+      ctx.fillRect(i * barWidth, 110 - h, barWidth, h);
     }
   };
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Ukuran file maksimal adalah 5MB.');
+      // Robust MIME Type validation
+      if (!file.type || !file.type.startsWith('image/')) {
+        showToast('File yang diunggah harus berupa gambar (JPG, PNG, WebP).', 'error');
+        if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('Ukuran file maksimal adalah 5MB.', 'error');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = (evt) => {
         setCustomImageSrc(evt.target.result);
+        showToast('Gambar custom berhasil diunggah!', 'success');
+      };
+      reader.onerror = () => {
+        showToast('Gagal membaca file gambar.', 'error');
       };
       reader.readAsDataURL(file);
     }
@@ -139,6 +187,31 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
 
   return (
     <div className="animate-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '40px' }}>
+      
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          zIndex: 1000,
+          background: toastType === 'error' ? 'var(--error-light)' : toastType === 'success' ? 'var(--success-light)' : 'rgba(81, 112, 255, 0.2)',
+          border: `1px solid ${toastType === 'error' ? 'var(--error)' : toastType === 'success' ? 'var(--success)' : 'var(--primary)'}`,
+          color: toastType === 'error' ? '#f87171' : toastType === 'success' ? '#4ade80' : '#93c5fd',
+          padding: '12px 20px',
+          borderRadius: '10px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+          fontSize: '0.9rem',
+          fontWeight: 600
+        }}>
+          {toastType === 'error' ? <AlertCircle size={18} /> : toastType === 'success' ? <CheckCircle2 size={18} /> : <Info size={18} />}
+          {toastMessage}
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
@@ -182,13 +255,13 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
         {/* Left Column: Parameter Controls */}
         <div className="glass-panel" style={{ padding: '24px' }}>
           <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Sliders size={18} style={{ color: 'var(--primary)' }} /> Parameter Simulasi
+            <Sliders size={18} style={{ color: 'var(--primary)' }} /> Atur Parameter Simulasi
           </h3>
 
           {/* Sample Image Selector */}
           <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>
-              PILIH GAMBAR UJI (PRESET / UPLOAD)
+            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+              CITRA MASUKAN (PRESET / UPLOAD)
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
               <button
@@ -223,8 +296,8 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
             <div>
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <label style={{ fontSize: '0.88rem', fontWeight: 600 }}>Jumlah Bin (Quantization)</label>
-                  <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{bins}</span>
+                  <label style={{ fontSize: '0.88rem', fontWeight: 600 }}>Interval Bin Visualisasi</label>
+                  <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{bins} Bins</span>
                 </div>
                 <input
                   type="range"
@@ -234,10 +307,11 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
                   value={bins}
                   onChange={(e) => setBins(Number(e.target.value))}
                   style={{ width: '100%', accentColor: 'var(--primary)' }}
+                  aria-label="Slider Jumlah Bin Histogram"
                 />
               </div>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                Ubah jumlah bin untuk melihat efek kuantisasi pada grafik histogram dan gambar kontras tinggi.
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                ℹ️ <strong>Catatan Pedagogis:</strong> Equalization diproses penuh pada 256 tingkat keabuan. Slider bin menentukan pengelompokan bar grafik histogram.
               </p>
             </div>
           )}
@@ -258,17 +332,18 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
                     border: '1px solid var(--dark-border)',
                     outline: 'none'
                   }}
+                  aria-label="Pilih Jenis Filter Spasial"
                 >
-                  <option value="gaussian">Gaussian Blur (Pencegah Noise)</option>
+                  <option value="gaussian">Gaussian Blur (Penghalus Alami)</option>
                   <option value="median">Median Filter (Noise Salt & Pepper)</option>
-                  <option value="average">Average / Mean Filter</option>
+                  <option value="average">Average / Mean Filter (Rata-rata)</option>
                 </select>
               </div>
 
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <label style={{ fontSize: '0.88rem', fontWeight: 600 }}>Ukuran Kernel Matriks</label>
-                  <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{kernelSize}x{kernelSize}</span>
+                  <label style={{ fontSize: '0.88rem', fontWeight: 600 }}>Ukuran Kernel Spasial</label>
+                  <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{kernelSize} × {kernelSize}</span>
                 </div>
                 <select
                   value={kernelSize}
@@ -282,12 +357,31 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
                     border: '1px solid var(--dark-border)',
                     outline: 'none'
                   }}
+                  aria-label="Pilih Ukuran Kernel Spasial"
                 >
-                  <option value={3}>3 x 3 (Halus)</option>
-                  <option value={5}>5 x 5 (Sedang)</option>
-                  <option value={7}>7 x 7 (Kuat)</option>
-                  <option value={9}>9 x 9 (Sangat Blur)</option>
+                  <option value={3}>3 x 3 (Tetangga 9 Piksel)</option>
+                  <option value={5}>5 x 5 (Tetangga 25 Piksel)</option>
+                  <option value={7}>7 x 7 (Tetangga 49 Piksel)</option>
+                  <option value={9}>9 x 9 (Tetangga 81 Piksel)</option>
                 </select>
+              </div>
+
+              {/* Kernel Matrix Visualizer */}
+              <div style={{
+                background: 'rgba(0,0,0,0.4)',
+                border: '1px solid var(--dark-border)',
+                padding: '14px',
+                borderRadius: '8px',
+                marginBottom: '20px'
+              }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-purple)', marginBottom: '8px', textTransform: 'uppercase' }}>
+                  Visualisasi Matriks Kernel ({kernelSize}x{kernelSize})
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontFamily: 'var(--font-code)' }}>
+                  {filterType === 'average' && `1/${kernelSize*kernelSize} × [ Matriks seragam 1 ]`}
+                  {filterType === 'gaussian' && `Gaussian Bell Curve (Sigma ≈ ${(kernelSize/3).toFixed(1)})`}
+                  {filterType === 'median' && `Median value array [ Sorting ${kernelSize*kernelSize} piksel ]`}
+                </div>
               </div>
             </div>
           )}
@@ -308,11 +402,12 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
                     border: '1px solid var(--dark-border)',
                     outline: 'none'
                   }}
+                  aria-label="Pilih Algoritma Deteksi Tepi"
                 >
-                  <option value="canny">Canny Edge Detector (Presisi Tinggi)</option>
+                  <option value="canny">Canny Edge Detector (Presisi Hysteresis)</option>
                   <option value="sobel">Sobel Operator (Gradien Orde 1)</option>
-                  <option value="prewitt">Prewitt Operator</option>
-                  <option value="laplacian">Laplacian Filter (Orde 2)</option>
+                  <option value="prewitt">Prewitt Operator (Seragam)</option>
+                  <option value="laplacian">Laplacian Filter (Orde 2 Zero-Crossing)</option>
                 </select>
               </div>
 
@@ -328,6 +423,7 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
                   value={lowThreshold}
                   onChange={(e) => setLowThreshold(Number(e.target.value))}
                   style={{ width: '100%', accentColor: 'var(--accent-cyan)' }}
+                  aria-label="Slider Low Threshold"
                 />
               </div>
 
@@ -344,6 +440,7 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
                     value={highThreshold}
                     onChange={(e) => setHighThreshold(Number(e.target.value))}
                     style={{ width: '100%', accentColor: 'var(--accent-purple)' }}
+                    aria-label="Slider High Threshold Canny"
                   />
                 </div>
               )}
@@ -356,6 +453,7 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
               setKernelSize(5);
               setLowThreshold(50);
               setHighThreshold(150);
+              showToast('Parameter berhasil direset!', 'info');
             }}
             className="btn-secondary"
             style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }}
@@ -373,11 +471,11 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
             {/* Source Image */}
             <div className="glass-panel" style={{ padding: '16px', textAlign: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>CITRA ASLI (BEFORE)</span>
-                <span className="badge badge-primary">Asli</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>CITRA MASUKAN (BEFORE)</span>
+                <span className="badge badge-primary">Masukan</span>
               </div>
-              <div style={{ borderRadius: '8px', overflow: 'hidden', background: '#000', display: 'flex', justifyContent: 'center' }}>
-                <canvas ref={sourceCanvasRef} style={{ maxWidth: '100%', height: 'auto', display: 'block' }} />
+              <div style={{ borderRadius: '8px', overflow: 'hidden', background: '#000', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+                <canvas ref={sourceCanvasRef} style={{ maxWidth: '100%', height: 'auto', display: 'block' }} aria-label="Canvas Citra Masukan Asli" />
               </div>
             </div>
 
@@ -385,10 +483,12 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
             <div className="glass-panel" style={{ padding: '16px', textAlign: 'center', borderColor: 'rgba(81, 112, 255, 0.3)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)' }}>HASIL PROSES (AFTER)</span>
-                <span className="badge badge-success">Processed</span>
+                <span className="badge badge-success">
+                  {isProcessing ? 'Memproses...' : 'Hasil Proses'}
+                </span>
               </div>
-              <div style={{ borderRadius: '8px', overflow: 'hidden', background: '#000', display: 'flex', justifyContent: 'center' }}>
-                <canvas ref={targetCanvasRef} style={{ maxWidth: '100%', height: 'auto', display: 'block' }} />
+              <div style={{ borderRadius: '8px', overflow: 'hidden', background: '#000', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+                <canvas ref={targetCanvasRef} style={{ maxWidth: '100%', height: 'auto', display: 'block' }} aria-label="Canvas Hasil Proses Pengolahan Citra" />
               </div>
             </div>
           </div>
@@ -399,11 +499,11 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
               <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '16px' }}>Grafik Perbandingan Histogram Spasial</h4>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px' }}>Histogram Asli (Sebelum)</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px' }}>Histogram Citra Masukan (Sebelum)</div>
                   <canvas ref={histSourceCanvasRef} style={{ width: '100%', height: '100px', background: 'rgba(0,0,0,0.3)', borderRadius: '6px' }} />
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginBottom: '6px' }}>Histogram Equalized (Sesudah)</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginBottom: '6px' }}>Histogram Equalized (Hasil Proses)</div>
                   <canvas ref={histTargetCanvasRef} style={{ width: '100%', height: '100px', background: 'rgba(0,0,0,0.3)', borderRadius: '6px' }} />
                 </div>
               </div>
@@ -418,14 +518,14 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
               </span>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(
-                    activeTab === 'histogram'
-                      ? `import cv2\nimg = cv2.imread('image.jpg', 0)\nequ = cv2.equalizeHist(img)`
-                      : activeTab === 'filtering'
-                      ? `import cv2\nimg = cv2.imread('image.jpg')\nresult = cv2.${filterType === 'gaussian' ? 'GaussianBlur' : filterType === 'median' ? 'medianBlur' : 'blur'}(img, (${kernelSize}, ${kernelSize})${filterType === 'gaussian' ? ', 0' : ''})`
-                      : `import cv2\nimg = cv2.imread('image.jpg', 0)\nedges = cv2.Canny(img, ${lowThreshold}, ${highThreshold})`
-                  );
-                  alert('Kode Python disalin ke clipboard!');
+                  const code = activeTab === 'histogram'
+                    ? `import cv2\nimg = cv2.imread('image.jpg', 0)\nequ = cv2.equalizeHist(img)`
+                    : activeTab === 'filtering'
+                    ? `import cv2\nimg = cv2.imread('image.jpg')\nresult = cv2.${filterType === 'gaussian' ? 'GaussianBlur' : filterType === 'median' ? 'medianBlur' : 'blur'}(img, (${kernelSize}, ${kernelSize})${filterType === 'gaussian' ? ', 0' : ''})`
+                    : `import cv2\nimg = cv2.imread('image.jpg', 0)\nedges = cv2.Canny(img, ${lowThreshold}, ${highThreshold})`;
+                  
+                  navigator.clipboard.writeText(code);
+                  showToast('Kode Python disalin ke clipboard!', 'success');
                 }}
                 className="btn-secondary"
                 style={{ padding: '4px 12px', fontSize: '0.78rem' }}
@@ -440,7 +540,8 @@ export default function InteractiveLab({ initialMode = 'histogram' }) {
               padding: '14px',
               borderRadius: '8px',
               color: '#c9d1d9',
-              overflowX: 'auto'
+              overflowX: 'auto',
+              margin: 0
             }}>
               <code>
                 {activeTab === 'histogram' && `# Python OpenCV - Histogram Equalization\nimport cv2\n\nimage = cv2.imread("input.jpg", 0)\nequalized_image = cv2.equalizeHist(image)`}

@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { quizQuestions } from '../data/quizData';
 import confetti from 'canvas-confetti';
-import { HelpCircle, Clock, CheckCircle2, XCircle, RotateCcw, Award, ArrowRight } from 'lucide-react';
+import { Clock, CheckCircle2, XCircle, RotateCcw, Award, ArrowRight } from 'lucide-react';
 
 export default function QuizEngine({ onQuizComplete }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedOption, setSelectedOption] = useState(null);
   const [answers, setAnswers] = useState({});
   const [timeLeft, setTimeLeft] = useState(30);
   const [isFinished, setIsFinished] = useState(false);
@@ -28,21 +27,18 @@ export default function QuizEngine({ onQuizComplete }) {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [currentIndex, isFinished]);
+  }, [currentIndex, isFinished, answers]);
 
   const handleSelectOption = (idx) => {
     if (answers[currentIndex] !== undefined) return; // Answer locked
-    setSelectedOption(idx);
     setAnswers(prev => ({ ...prev, [currentIndex]: idx }));
   };
 
   const handleNextQuestion = () => {
     if (currentIndex < quizQuestions.length - 1) {
       setCurrentIndex(prev => prev + 1);
-      setSelectedOption(answers[currentIndex + 1] ?? null);
       setTimeLeft(30);
     } else {
-      // Finish Quiz
       calculateFinalResult();
     }
   };
@@ -60,11 +56,15 @@ export default function QuizEngine({ onQuizComplete }) {
     setIsFinished(true);
 
     if (finalScore >= 70) {
-      confetti({
-        particleCount: 120,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
+      try {
+        confetti({
+          particleCount: 120,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      } catch (e) {
+        console.warn('Confetti animation failed:', e);
+      }
     }
 
     if (onQuizComplete) {
@@ -74,7 +74,6 @@ export default function QuizEngine({ onQuizComplete }) {
 
   const resetQuiz = () => {
     setCurrentIndex(0);
-    setSelectedOption(null);
     setAnswers({});
     setTimeLeft(30);
     setIsFinished(false);
@@ -101,10 +100,10 @@ export default function QuizEngine({ onQuizComplete }) {
           </div>
 
           <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '10px' }}>
-            {passed ? 'Selamat! Anda Lulus Kuis 🎉' : 'Tetap Semangat! Ulangi Kuis 💪'}
+            {passed ? 'Selamat! Anda Lulus Evaluasi Kuis 🎉' : 'Tetap Semangat! Ulangi Kuis 💪'}
           </h2>
           <p style={{ color: 'var(--text-muted)', marginBottom: '30px' }}>
-            {passed ? 'Anda berhasil menguasai konsep dasar Pengolahan Citra Digital!' : 'Pelajari kembali materi modul untuk tingkatkan pemahaman Anda.'}
+            {passed ? 'Anda berhasil menguasai konsep dasar Pengolahan Citra Digital!' : 'Pelajari kembali materi modul untuk meningkatkan pemahaman Anda.'}
           </p>
 
           <div style={{
@@ -121,7 +120,7 @@ export default function QuizEngine({ onQuizComplete }) {
               <div style={{ fontSize: '2rem', fontWeight: 800, color: passed ? 'var(--success)' : 'var(--warning)' }}>{score} / 100</div>
             </div>
             <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>BENAR</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>SOAL BENAR</div>
               <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--success)' }}>
                 {Object.keys(answers).filter(idx => answers[idx] === quizQuestions[idx].answer).length}
               </div>
@@ -146,8 +145,8 @@ export default function QuizEngine({ onQuizComplete }) {
 
   return (
     <div className="animate-fade-in" style={{ maxWidth: '800px', margin: '0 auto', paddingBottom: '60px' }}>
-      
-      {/* Quiz Top Header */}
+
+      {/* Quiz Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div>
           <span className="badge badge-primary" style={{ marginRight: '10px' }}>Game Kuis</span>
@@ -192,6 +191,7 @@ export default function QuizEngine({ onQuizComplete }) {
                 key={idx}
                 onClick={() => handleSelectOption(idx)}
                 disabled={isAnswered}
+                aria-label={`Pilihan ${String.fromCharCode(65 + idx)}: ${opt}`}
                 style={{
                   textAlign: 'left',
                   padding: '16px 20px',
@@ -203,7 +203,7 @@ export default function QuizEngine({ onQuizComplete }) {
                   fontWeight: isSelected ? 600 : 400,
                   cursor: isAnswered ? 'default' : 'pointer',
                   display: 'flex',
-                  justify: 'space-between',
+                  justifyContent: 'space-between',
                   alignItems: 'center',
                   transition: 'var(--transition)'
                 }}

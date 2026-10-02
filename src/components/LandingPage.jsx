@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Sparkles, BookOpen, Cpu, Shield, Award, ChevronRight, BarChart2, Sliders, Maximize2 } from 'lucide-react';
+import { Play, Sparkles, BookOpen, Cpu, Award, ChevronRight, BarChart2, Sliders, Maximize2 } from 'lucide-react';
 
 export default function LandingPage({ onStart, onSelectModule }) {
   return (

@@ -8,7 +8,6 @@ export function calculateHistogram(ctx, width, height, bins = 256) {
   const binRatio = 256 / bins;
 
   for (let i = 0; i < data.length; i += 4) {
-    // Grayscale luminance conversion (NTSC formula)
     const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
     const binIndex = Math.min(bins - 1, Math.floor(gray / binRatio));
     histogram[binIndex]++;
@@ -45,32 +44,26 @@ export function applyHistogramEqualization(sourceCtx, targetCtx, width, height, 
     }
   }
 
-  // Quantization level mapping based on bins slider
-  const binRatio = 256 / bins;
   const outputData = targetCtx.createImageData(width, height);
   const out = outputData.data;
 
+  // Pure Histogram Equalization formula (256 gray levels)
   for (let i = 0, j = 0; i < out.length; i += 4, j++) {
     const g = grays[j];
-    // Standard Histogram Equalization formula
     let eqVal = Math.round(((cdf[g] - minCdf) / (totalPixels - minCdf)) * 255);
     eqVal = Math.max(0, Math.min(255, eqVal));
 
-    // Quantize according to bin count
-    const quantized = Math.floor(eqVal / binRatio) * binRatio + binRatio / 2;
-    const finalVal = Math.min(255, Math.max(0, Math.round(quantized)));
-
-    out[i] = finalVal;     // R
-    out[i + 1] = finalVal; // G
-    out[i + 2] = finalVal; // B
-    out[i + 3] = 255;      // A
+    out[i] = eqVal;     // R
+    out[i + 1] = eqVal; // G
+    out[i + 2] = eqVal; // B
+    out[i + 3] = 255;   // A
   }
 
   targetCtx.putImageData(outputData, 0, 0);
   return calculateHistogram(targetCtx, width, height, bins);
 }
 
-// 3. Enhancement & Filtering (Gaussian, Median, Average, Sobel)
+// 3. Enhancement & Filtering (Gaussian, Median, Average)
 export function applyFilter(sourceCtx, targetCtx, width, height, filterType, kernelSize = 3) {
   const imgData = sourceCtx.getImageData(0, 0, width, height);
   const src = imgData.data;
@@ -78,7 +71,7 @@ export function applyFilter(sourceCtx, targetCtx, width, height, filterType, ker
   const dst = outputData.data;
   const half = Math.floor(kernelSize / 2);
 
-  // Convert to grayscale matrix for simplified processing
+  // Convert to grayscale matrix
   const grayMat = new Uint8Array(width * height);
   for (let i = 0, j = 0; i < src.length; i += 4, j++) {
     grayMat[j] = Math.round(0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2]);
@@ -103,7 +96,6 @@ export function applyFilter(sourceCtx, targetCtx, width, height, filterType, ker
       }
     }
   } else if (filterType === 'gaussian') {
-    // Generate 2D Gaussian Kernel
     const sigma = Math.max(0.8, kernelSize / 3);
     const kernel = [];
     let kSum = 0;
@@ -145,7 +137,7 @@ export function applyFilter(sourceCtx, targetCtx, width, height, filterType, ker
             windowVals[count++] = grayMat[py * width + px];
           }
         }
-        // Insertion sort for performance
+        // Insertion sort
         for (let i = 1; i < count; i++) {
           const key = windowVals[i];
           let j = i - 1;
@@ -161,15 +153,12 @@ export function applyFilter(sourceCtx, targetCtx, width, height, filterType, ker
         dst[idx + 3] = 255;
       }
     }
-  } else if (filterType === 'sobel') {
-    applyEdgeDetection(sourceCtx, targetCtx, width, height, 'sobel', { lowThreshold: 30 });
-    return;
   }
 
   targetCtx.putImageData(outputData, 0, 0);
 }
 
-// 4. Segmentation & Edge Detection (Sobel, Canny, Prewitt, Laplacian)
+// 4. Edge Detection (Sobel, Canny, Prewitt, Laplacian)
 export function applyEdgeDetection(sourceCtx, targetCtx, width, height, algorithm, params = {}) {
   const { lowThreshold = 30, highThreshold = 100 } = params;
   const imgData = sourceCtx.getImageData(0, 0, width, height);
@@ -244,7 +233,7 @@ export function applyEdgeDetection(sourceCtx, targetCtx, width, height, algorith
     }
   } else if (algorithm === 'canny') {
     // Multi-stage Canny Edge Detection
-    // 1. Gaussian Blur (3x3)
+    // 1. Gaussian Smoothing (3x3)
     const blurred = new Float32Array(width * height);
     const gKernel = [[1/16, 2/16, 1/16], [2/16, 4/16, 2/16], [1/16, 2/16, 1/16]];
     for (let y = 1; y < height - 1; y++) {
@@ -259,7 +248,7 @@ export function applyEdgeDetection(sourceCtx, targetCtx, width, height, algorith
       }
     }
 
-    // 2. Gradients & Angles
+    // 2. Gradient magnitude and direction
     const magMat = new Float32Array(width * height);
     const dirMat = new Float32Array(width * height);
     const Gx = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
@@ -282,15 +271,14 @@ export function applyEdgeDetection(sourceCtx, targetCtx, width, height, algorith
       }
     }
 
-    // 3. Non-Maximum Suppression
+    // 3. Non-Maximum Suppression (NMS)
     const nms = new Float32Array(width * height);
     for (let y = 1; y < height - 1; y++) {
       for (let x = 1; x < width - 1; x++) {
         const m = magMat[y * width + x];
         const angle = dirMat[y * width + x];
-        let q = 255, r = 255;
+        let q = 0, r = 0;
 
-        // Angle sectoring
         if ((angle >= 0 && angle < 22.5) || (angle >= 157.5 && angle <= 180)) {
           q = magMat[y * width + (x + 1)];
           r = magMat[y * width + (x - 1)];
@@ -313,29 +301,51 @@ export function applyEdgeDetection(sourceCtx, targetCtx, width, height, algorith
       }
     }
 
-    // 4. Double Thresholding & Hysteresis
+    // 4. Double Thresholding and Hysteresis with 8-Connected Traversal (BFS)
+    const result = new Uint8Array(width * height); // 0: non-edge, 255: edge, 100: weak
+    const stack = [];
+
     for (let y = 1; y < height - 1; y++) {
       for (let x = 1; x < width - 1; x++) {
         const val = nms[y * width + x];
-        let finalEdge = 0;
+        const idx = y * width + x;
         if (val >= highThreshold) {
-          finalEdge = 255;
+          result[idx] = 255;
+          stack.push(idx); // Strong edge seed
         } else if (val >= lowThreshold) {
-          // Check 8-connected neighbors for strong edges
-          let isConnected = false;
-          for (let ky = -1; ky <= 1; ky++) {
-            for (let kx = -1; kx <= 1; kx++) {
-              if (nms[(y + ky) * width + (x + kx)] >= highThreshold) {
-                isConnected = true;
-                break;
-              }
+          result[idx] = 100; // Weak edge candidate
+        }
+      }
+    }
+
+    // Hysteresis Connected Edge Tracking via Stack Traversal
+    while (stack.length > 0) {
+      const currIdx = stack.pop();
+      const cy = Math.floor(currIdx / width);
+      const cx = currIdx % width;
+
+      for (let ky = -1; ky <= 1; ky++) {
+        for (let kx = -1; kx <= 1; kx++) {
+          if (ky === 0 && kx === 0) continue;
+          const ny = cy + ky;
+          const nx = cx + kx;
+          if (ny >= 1 && ny < height - 1 && nx >= 1 && nx < width - 1) {
+            const nIdx = ny * width + nx;
+            if (result[nIdx] === 100) {
+              result[nIdx] = 255;
+              stack.push(nIdx);
             }
           }
-          finalEdge = isConnected ? 255 : 0;
         }
+      }
+    }
 
+    // Output mapping
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
         const idx = (y * width + x) * 4;
-        dst[idx] = dst[idx + 1] = dst[idx + 2] = finalEdge;
+        const val = result[y * width + x] === 255 ? 255 : 0;
+        dst[idx] = dst[idx + 1] = dst[idx + 2] = val;
         dst[idx + 3] = 255;
       }
     }
