@@ -4,7 +4,6 @@ import ModuleViewer from './components/ModuleViewer';
 import InteractiveLab from './components/InteractiveLab';
 import QuizEngine from './components/QuizEngine';
 import AchievementView from './components/AchievementView';
-import { Layout, BookOpen, Layers, Award, HelpCircle, Menu, X } from 'lucide-react';
 import './App.css';
 
 // Safe LocalStorage helpers
@@ -27,16 +26,13 @@ const setSafeLocalStorage = (key, value) => {
 };
 
 function App() {
-  // Navigation View State: 'home' | 'module' | 'lab' | 'quiz' | 'achievement'
   const [currentView, setCurrentView] = useState('home');
   const [selectedModuleId, setSelectedModuleId] = useState('histogram');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Persistent user state in LocalStorage with safe fallbacks
   const [completedModules, setCompletedModules] = useState(() => 
     getSafeLocalStorage('pixelvision_completed_modules', [])
   );
-
   const [quizScore, setQuizScore] = useState(() => 
     getSafeLocalStorage('pixelvision_quiz_score', null)
   );
@@ -85,149 +81,86 @@ function App() {
   };
 
   return (
-    <div className="app-container">
+    <div className="app-container bg-background min-h-screen flex flex-col text-on-surface font-body-md antialiased selection:bg-primary-container selection:text-on-primary-container">
       
       {/* Top Navbar */}
-      <header className="glass-panel" style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        borderRadius: 0,
-        borderLeft: 'none',
-        borderRight: 'none',
-        borderTop: 'none',
-        padding: '14px 24px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        background: 'rgba(11, 15, 25, 0.9)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="btn-secondary"
-            style={{ padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            aria-label="Toggle Menu Navigasi"
-          >
-            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-          
-          <div
-            onClick={() => setCurrentView('home')}
-            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}
-          >
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, var(--primary), #8b5cf6)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 800,
-              color: '#fff',
-              fontSize: '1.2rem',
-              boxShadow: '0 0 15px rgba(81, 112, 255, 0.4)'
-            }}>
-              P
+      <header className="fixed top-0 w-full z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.4)]">
+        <div className="h-16 w-full px-gutter-lg flex items-center justify-between gap-gutter">
+          <div className="flex items-center gap-space-md">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="xl:hidden flex items-center justify-center w-8 h-8 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">{sidebarOpen ? 'close' : 'menu'}</span>
+            </button>
+            <div 
+              className="flex flex-col cursor-pointer"
+              onClick={() => setCurrentView('home')}
+            >
+              <span className="font-headline-sm text-headline-sm text-primary tracking-tight font-bold uppercase leading-none">PixelVision</span>
+              <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider pt-space-xs">Digital Image Processing Lab</span>
             </div>
-            <span style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.5px' }}>
-              Pixel<span style={{ color: 'var(--primary)' }}>Vision</span>
-            </span>
+          </div>
+          <nav className="hidden xl:flex items-center gap-space-xs p-1 bg-surface-container-lowest rounded-lg">
+            <button onClick={() => setCurrentView('home')} className={`px-space-md py-space-sm transition-all font-medium rounded-lg ${currentView === 'home' ? 'bg-surface-container-high text-primary' : 'font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface'}`}>Beranda</button>
+            <button onClick={() => { setSelectedModuleId('histogram'); setCurrentView('module'); }} className={`px-space-md py-space-sm transition-all font-medium rounded-lg ${currentView === 'module' ? 'bg-surface-container-high text-primary' : 'font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface'}`}>Modul</button>
+            <button onClick={() => setCurrentView('lab')} className={`px-space-md py-space-sm transition-all font-medium rounded-lg ${currentView === 'lab' ? 'bg-surface-container-high text-primary' : 'font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface'}`}>Simulasi Lab</button>
+            <button onClick={() => setCurrentView('quiz')} className={`px-space-md py-space-sm transition-all font-medium rounded-lg ${currentView === 'quiz' ? 'bg-surface-container-high text-primary' : 'font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface'}`}>Kuis &amp; Evaluasi</button>
+            <button onClick={() => setCurrentView('achievement')} className={`px-space-md py-space-sm transition-all font-medium rounded-lg ${currentView === 'achievement' ? 'bg-surface-container-high text-primary' : 'font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface'}`}>Pencapaian</button>
+          </nav>
+          <div className="flex items-center gap-space-md">
+            <div className="hidden md:flex items-center gap-space-sm px-space-md py-space-xs bg-surface-container-low rounded-full">
+              <span className="font-label-sm text-label-sm text-on-surface-variant">Progres Belajar:</span>
+              <span className="font-code-sm text-code-sm text-secondary font-medium">{Math.min(100, Math.round((completedModules.length / 5) * 100))}%</span>
+              <div className="w-12 h-1.5 bg-surface-container-highest rounded-full overflow-hidden ml-space-xs">
+                <div className="h-full bg-secondary-container rounded-full" style={{ width: `${Math.min(100, Math.round((completedModules.length / 5) * 100))}%` }}></div>
+              </div>
+            </div>
+            <button className="flex items-center justify-center w-8 h-8 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors">
+              <span className="material-symbols-outlined text-[18px]">search</span>
+            </button>
+            <div className="flex items-center gap-space-sm pl-space-sm">
+              <div className="hidden lg:flex flex-col text-right">
+                <span className="font-label-sm text-label-sm text-on-surface font-medium leading-tight">Mahasiswa</span>
+                <span className="font-label-sm text-label-sm text-secondary leading-tight">Lab Active</span>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                <span className="material-symbols-outlined text-on-primary text-[18px]">person</span>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Desktop Navbar Links */}
-        <nav style={{ display: 'flex', gap: '8px', alignItems: 'center' }} aria-label="Menu Utama">
-          <button
-            onClick={() => setCurrentView('home')}
-            className={currentView === 'home' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '8px 16px', fontSize: '0.88rem' }}
-          >
-            Beranda
-          </button>
-          <button
-            onClick={() => { setSelectedModuleId('histogram'); setCurrentView('module'); }}
-            className={currentView === 'module' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '8px 16px', fontSize: '0.88rem' }}
-          >
-            Modul Materi
-          </button>
-          <button
-            onClick={() => setCurrentView('lab')}
-            className={currentView === 'lab' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '8px 16px', fontSize: '0.88rem' }}
-          >
-            <Layers size={16} /> Image Lab
-          </button>
-          <button
-            onClick={() => setCurrentView('quiz')}
-            className={currentView === 'quiz' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '8px 16px', fontSize: '0.88rem' }}
-          >
-            <HelpCircle size={16} /> Game Kuis
-          </button>
-          <button
-            onClick={() => setCurrentView('achievement')}
-            className={currentView === 'achievement' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '8px 16px', fontSize: '0.88rem' }}
-          >
-            <Award size={16} /> Pencapaian
-          </button>
-        </nav>
       </header>
 
-      {/* Slide-out Navigation Drawer */}
+      {/* Slide-out Navigation Drawer for Mobile */}
       {sidebarOpen && (
-        <div className="glass-panel animate-fade-in" style={{
-          position: 'fixed',
-          top: '65px',
-          left: '20px',
-          zIndex: 99,
-          width: '280px',
-          padding: '20px',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
-        }}>
-          <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px' }}>
-            NAVIGASI CEPAT
-          </h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <button onClick={() => { setCurrentView('home'); setSidebarOpen(false); }} className="btn-secondary" style={{ justifyContent: 'flex-start' }}>
-              <Layout size={16} /> Beranda / Utama
-            </button>
-            <button onClick={() => { handleSelectModule('histogram'); }} className="btn-secondary" style={{ justifyContent: 'flex-start' }}>
-              <BookOpen size={16} /> Modul 1: Histogram Eq
-            </button>
-            <button onClick={() => { handleSelectModule('filtering'); }} className="btn-secondary" style={{ justifyContent: 'flex-start' }}>
-              <BookOpen size={16} /> Modul 2: Enhancement & Filter
-            </button>
-            <button onClick={() => { handleSelectModule('edge'); }} className="btn-secondary" style={{ justifyContent: 'flex-start' }}>
-              <BookOpen size={16} /> Modul 3: Segmentasi & Tepi
-            </button>
-            <button onClick={() => { setCurrentView('lab'); setSidebarOpen(false); }} className="btn-secondary" style={{ justifyContent: 'flex-start' }}>
-              <Layers size={16} /> Image Lab Simulasi
-            </button>
-            <button onClick={() => { setCurrentView('quiz'); setSidebarOpen(false); }} className="btn-secondary" style={{ justifyContent: 'flex-start' }}>
-              <HelpCircle size={16} /> Game Kuis / Evaluasi
-            </button>
-            <button onClick={() => { setCurrentView('achievement'); setSidebarOpen(false); }} className="btn-secondary" style={{ justifyContent: 'flex-start' }}>
-              <Award size={16} /> Skor & Pencapaian
-            </button>
+        <div className="fixed inset-0 z-40 flex">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setSidebarOpen(false)}></div>
+          <div className="relative flex flex-col w-64 max-w-sm h-full bg-surface-container-lowest border-r border-outline-variant/20 shadow-xl p-4 gap-2 z-50">
+            <h4 className="font-label-sm text-label-sm font-bold text-on-surface-variant uppercase tracking-wider mb-2">Navigasi Utama</h4>
+            <button onClick={() => { setCurrentView('home'); setSidebarOpen(false); }} className={`text-left px-4 py-2 rounded-lg font-medium transition-colors ${currentView === 'home' ? 'bg-primary/10 text-primary' : 'text-on-surface hover:bg-surface-container'}`}>Beranda</button>
+            <button onClick={() => { handleSelectModule('histogram'); }} className={`text-left px-4 py-2 rounded-lg font-medium transition-colors ${currentView === 'module' ? 'bg-primary/10 text-primary' : 'text-on-surface hover:bg-surface-container'}`}>Modul Materi</button>
+            <button onClick={() => { setCurrentView('lab'); setSidebarOpen(false); }} className={`text-left px-4 py-2 rounded-lg font-medium transition-colors ${currentView === 'lab' ? 'bg-primary/10 text-primary' : 'text-on-surface hover:bg-surface-container'}`}>Simulasi Lab</button>
+            <button onClick={() => { setCurrentView('quiz'); setSidebarOpen(false); }} className={`text-left px-4 py-2 rounded-lg font-medium transition-colors ${currentView === 'quiz' ? 'bg-primary/10 text-primary' : 'text-on-surface hover:bg-surface-container'}`}>Kuis &amp; Evaluasi</button>
+            <button onClick={() => { setCurrentView('achievement'); setSidebarOpen(false); }} className={`text-left px-4 py-2 rounded-lg font-medium transition-colors ${currentView === 'achievement' ? 'bg-primary/10 text-primary' : 'text-on-surface hover:bg-surface-container'}`}>Pencapaian</button>
           </div>
         </div>
       )}
 
       {/* Main Content Area */}
-      <main style={{ flex: 1, padding: '30px 20px' }}>
+      <main className="flex-1 w-full pt-16 bg-background flex flex-col">
         {currentView === 'home' && (
-          <LandingPage
-            onStart={() => { setSelectedModuleId('histogram'); setCurrentView('module'); }}
-            onSelectModule={handleSelectModule}
-          />
+          <div className="p-gutter-lg flex-1">
+            <LandingPage
+              onStart={() => { setSelectedModuleId('histogram'); setCurrentView('module'); }}
+              onSelectModule={handleSelectModule}
+            />
+          </div>
         )}
 
         {currentView === 'module' && (
           <ModuleViewer
+            key={`module-${selectedModuleId}`}
             moduleId={selectedModuleId}
             onNavigateToSim={handleNavigateToSim}
             onCompleteModule={handleCompleteModule}
@@ -236,33 +169,42 @@ function App() {
         )}
 
         {currentView === 'lab' && (
-          <InteractiveLab initialMode={selectedModuleId} />
+          <div className="p-gutter-lg flex-1">
+            <InteractiveLab key={`lab-${selectedModuleId}`} initialMode={selectedModuleId} />
+          </div>
         )}
 
         {currentView === 'quiz' && (
-          <QuizEngine onQuizComplete={handleQuizComplete} />
+          <div className="p-gutter-lg flex-1">
+            <QuizEngine onQuizComplete={handleQuizComplete} />
+          </div>
         )}
 
         {currentView === 'achievement' && (
-          <AchievementView
-            completedModules={Array.isArray(completedModules) ? completedModules : []}
-            quizScore={quizScore}
-            onResetProgress={handleResetProgress}
-          />
+          <div className="p-gutter-lg flex-1">
+            <AchievementView
+              completedModules={Array.isArray(completedModules) ? completedModules : []}
+              quizScore={quizScore}
+              onResetProgress={handleResetProgress}
+            />
+          </div>
         )}
       </main>
 
       {/* Footer */}
-      <footer style={{
-        padding: '24px',
-        textAlign: 'center',
-        borderTop: '1px solid rgba(255,255,255,0.08)',
-        color: 'var(--text-muted)',
-        fontSize: '0.88rem'
-      }}>
-        PixelVision © 2026 — Interactive Digital Image Processing Learning Media. Built with React & Canvas API.
+      <footer className="w-full bg-surface-container-lowest py-space-md border-t border-outline-variant/10">
+        <div className="w-full px-gutter-lg flex flex-col md:flex-row items-center justify-between gap-space-md">
+          <div className="flex items-center gap-space-sm font-code-sm text-code-sm text-on-surface-variant">
+            <span className="inline-block w-2 h-2 rounded-full bg-secondary-container"></span>
+            <span>Kernel Engine: v4.2-wasm</span>
+            <span className="text-outline-variant">•</span>
+            <span>OpenCV Embedded</span>
+            <span className="text-outline-variant">•</span>
+            <span>Pipeline: Operational</span>
+          </div>
+          <div className="font-body-sm text-body-sm text-on-surface-variant">© 2026 PixelVision Computational Laboratory. All academic research rights reserved.</div>
+        </div>
       </footer>
-
     </div>
   );
 }

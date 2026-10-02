@@ -1,52 +1,161 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { modulesData } from '../data/modulesData';
-import { Code, Play, ChevronRight, ArrowLeft, CheckCircle, Eye, Target, Sparkles } from 'lucide-react';
 
-// Lightweight Markdown & Math Notation Parser Component
+// Custom Audio Player Component
+function AudioPlayer({ src }) {
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
+
+  useEffect(() => {
+    setIsPlaying(false);
+    setProgress(0);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, [src]);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play().catch(e => console.log('Audio file not provided/loaded yet.', e));
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  const handleTimeUpdate = () => {
+    if (!audioRef.current) return;
+    const current = audioRef.current.currentTime;
+    const duration = audioRef.current.duration;
+    if (duration) {
+      setProgress((current / duration) * 100);
+    }
+  };
+
+  const handleReplay = () => {
+    if (!audioRef.current) return;
+    audioRef.current.currentTime = 0;
+    if (!isPlaying) {
+      audioRef.current.play().catch(e => console.log('Audio file not provided/loaded yet.', e));
+      setIsPlaying(true);
+    }
+  };
+
+  const toggleMute = () => {
+    if (!audioRef.current) return;
+    audioRef.current.muted = !isMuted;
+    setIsMuted(!isMuted);
+  };
+
+  if (!src) return null;
+
+  return (
+    <div className="flex items-center gap-3 bg-surface-container-low p-3 rounded-lg border border-outline-variant/20 shadow-sm mt-4 w-full md:max-w-md">
+      <audio 
+        ref={audioRef} 
+        src={src} 
+        onTimeUpdate={handleTimeUpdate}
+        onEnded={() => setIsPlaying(false)}
+      />
+      
+      {/* Play/Pause */}
+      <button 
+        onClick={togglePlay} 
+        className="flex items-center justify-center shrink-0 w-10 h-10 rounded-full bg-primary text-on-primary hover:bg-primary/90 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/50" 
+        aria-label={isPlaying ? 'Pause Narasi' : 'Play Narasi'}
+      >
+        <span className="material-symbols-outlined">{isPlaying ? 'pause' : 'play_arrow'}</span>
+      </button>
+
+      {/* Replay */}
+      <button 
+        onClick={handleReplay} 
+        className="flex items-center justify-center shrink-0 w-8 h-8 rounded-full bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-colors focus:outline-none" 
+        aria-label="Ulangi Narasi"
+      >
+        <span className="material-symbols-outlined text-[18px]">replay</span>
+      </button>
+
+      {/* Mute/Volume */}
+      <button 
+        onClick={toggleMute} 
+        className="flex items-center justify-center shrink-0 w-8 h-8 rounded-full bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-colors focus:outline-none" 
+        aria-label={isMuted ? 'Unmute' : 'Mute'}
+      >
+        <span className="material-symbols-outlined text-[18px]">{isMuted ? 'volume_off' : 'volume_up'}</span>
+      </button>
+      
+      {/* Progress & Label */}
+      <div className="flex flex-col gap-1.5 w-full">
+        <div className="flex items-center justify-between text-xs text-on-surface-variant font-medium uppercase tracking-wider">
+          <span>🔊 Dengarkan Penjelasan</span>
+        </div>
+        <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
+          <div className="h-full bg-primary transition-all duration-200" style={{ width: `${progress}%` }}></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Text & Formatting Renderer
 function TextRenderer({ content }) {
   if (!content) return null;
-
   const paragraphs = content.split('\n\n');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className="flex flex-col gap-space-md font-body-lg text-on-surface leading-[1.8]">
       {paragraphs.map((para, pIdx) => {
+        // Handle Lists
         if (para.trim().startsWith('- ') || para.trim().startsWith('1. ')) {
           const items = para.trim().split('\n');
           return (
-            <ul key={pIdx} style={{ paddingLeft: '24px', margin: 0, color: '#d1d5db', lineHeight: 1.8 }}>
+            <ul key={pIdx} className="list-disc pl-6 space-y-3 text-on-surface-variant marker:text-primary">
               {items.map((item, iIdx) => {
                 const cleanItem = item.replace(/^[-*]\s+|^[0-9]+\.\s+/, '');
-                return <li key={iIdx} style={{ marginBottom: '6px' }}>{renderInlineFormatting(cleanItem)}</li>;
+                return <li key={iIdx}>{renderInlineFormatting(cleanItem)}</li>;
               })}
             </ul>
           );
         }
 
+        // Handle Math Formulas
         if (para.trim().startsWith('$$') && para.trim().endsWith('$$')) {
-          const formula = para.trim().slice(2, -2).trim();
+          const formulas = para.trim().split('\n');
           return (
             <div
               key={pIdx}
-              style={{
-                background: 'rgba(81, 112, 255, 0.08)',
-                borderLeft: '4px solid var(--primary)',
-                padding: '14px 20px',
-                borderRadius: '8px',
-                fontFamily: 'var(--font-code)',
-                fontSize: '1rem',
-                color: '#93c5fd',
-                textAlign: 'center',
-                margin: '8px 0'
-              }}
+              className="my-6 p-space-lg bg-surface-container-lowest rounded-lg flex flex-col items-center justify-center overflow-x-auto text-center border border-outline-variant/20 shadow-sm"
             >
-              {formula}
+              {formulas.map((f, i) => {
+                const cleanF = f.replace(/\$\$/g, '').trim();
+                return (
+                  <span key={i} className="font-code-lg text-[1.15rem] text-primary font-bold tracking-wide my-1">
+                    {cleanF}
+                  </span>
+                );
+              })}
             </div>
           );
         }
+        
+        // Blockquotes/Callouts for APA, MENGAPA, BAGAIMANA
+        if (para.trim().startsWith('**APA?**') || para.trim().startsWith('**MENGAPA?**') || para.trim().startsWith('**BAGAIMANA?**') || para.trim().startsWith('**CONTOH?**') || para.trim().startsWith('**COBA!**')) {
+           return (
+             <div key={pIdx} className="bg-surface-container-low p-5 rounded-lg border-l-4 border-primary shadow-sm my-2">
+               <p className="text-on-surface">
+                 {renderInlineFormatting(para)}
+               </p>
+             </div>
+           )
+        }
 
         return (
-          <p key={pIdx} style={{ color: '#d1d5db', lineHeight: 1.8, fontSize: '0.98rem', margin: 0 }}>
+          <p key={pIdx} className="text-on-surface-variant">
             {renderInlineFormatting(para)}
           </p>
         );
@@ -56,24 +165,15 @@ function TextRenderer({ content }) {
 }
 
 function renderInlineFormatting(text) {
+  // Correct regex for matching bold or code blocks
   const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
   return parts.map((part, idx) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={idx} style={{ color: '#ffffff', fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
+      return <strong key={idx} className="font-bold text-on-surface">{part.slice(2, -2)}</strong>;
     }
     if (part.startsWith('`') && part.endsWith('`')) {
       return (
-        <code
-          key={idx}
-          style={{
-            background: 'rgba(255,255,255,0.1)',
-            padding: '2px 6px',
-            borderRadius: '4px',
-            fontFamily: 'var(--font-code)',
-            fontSize: '0.88rem',
-            color: '#a78bfa'
-          }}
-        >
+        <code key={idx} className="font-code-sm text-code-sm bg-surface-container-highest px-1.5 py-0.5 rounded text-secondary shadow-sm">
           {part.slice(1, -1)}
         </code>
       );
@@ -84,188 +184,184 @@ function renderInlineFormatting(text) {
 
 export default function ModuleViewer({ moduleId, onNavigateToSim, onCompleteModule, completedModules = [] }) {
   const [activeTopicIndex, setActiveTopicIndex] = useState(0);
+
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [activeTopicIndex, moduleId]);
+
   const currentModule = modulesData.find(m => m.id === moduleId) || modulesData[0];
   const isCompleted = Array.isArray(completedModules) && completedModules.includes(currentModule.id);
   const currentTopic = currentModule.topics[activeTopicIndex] || currentModule.topics[0];
+  const progressPercent = Math.round(((activeTopicIndex + 1) / currentModule.topics.length) * 100);
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: '1050px', margin: '0 auto', paddingBottom: '60px' }}>
-
-      {/* Top Bar Navigation */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
-        <span className="badge badge-primary" style={{ padding: '6px 14px', fontSize: '0.82rem' }}>
-          {currentModule.category}
-        </span>
-        <button
-          onClick={() => onCompleteModule(currentModule.id)}
-          className={isCompleted ? 'btn-secondary' : 'btn-primary'}
-          style={{
-            background: isCompleted ? 'rgba(34, 197, 94, 0.15)' : undefined,
-            color: isCompleted ? '#4ade80' : undefined,
-            borderColor: isCompleted ? 'rgba(34, 197, 94, 0.3)' : undefined
-          }}
-        >
-          <CheckCircle size={18} /> {isCompleted ? 'Materi Selesai ✓' : 'Tandai Selesai'}
-        </button>
-      </div>
-
-      {/* Module Title Header */}
-      <div className="glass-panel" style={{ padding: '32px', marginBottom: '30px' }}>
-        <h1 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '12px' }}>{currentModule.title}</h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '1.05rem', lineHeight: 1.6 }}>
-          {currentModule.description}
-        </p>
-      </div>
-
-      {/* Content Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 280px) 1fr', gap: '24px' }}>
-
-        {/* Topic Navigation Sidebar */}
-        <div className="glass-panel" style={{ padding: '16px', height: 'fit-content' }}>
-          <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px', paddingLeft: '8px' }}>
-            DAFTAR TOPIK MATERI
-          </h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {currentModule.topics.map((topic, index) => (
-              <button
-                key={index}
-                onClick={() => setActiveTopicIndex(index)}
-                style={{
-                  textAlign: 'left',
-                  padding: '12px 14px',
-                  borderRadius: '8px',
-                  background: activeTopicIndex === index ? 'var(--primary-light)' : 'transparent',
-                  color: activeTopicIndex === index ? '#708aff' : 'var(--text-main)',
-                  border: activeTopicIndex === index ? '1px solid rgba(81, 112, 255, 0.3)' : '1px solid transparent',
-                  fontWeight: activeTopicIndex === index ? 600 : 400,
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                  transition: 'var(--transition)'
-                }}
-              >
-                {index + 1}. {topic.title}
-              </button>
-            ))}
+    <div className="flex flex-col w-full animate-fade-in pb-16">
+      {/* Sub-header / Academic Meta Bar */}
+      <section className="w-full bg-surface-container-lowest px-gutter-lg py-space-sm shadow-sm border-b border-outline-variant/10">
+        <div className="max-w-[1720px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-space-sm">
+          <div className="flex items-center gap-space-xs font-code-sm text-code-sm text-on-surface-variant flex-wrap">
+            <span className="flex items-center gap-1">
+              <span className="material-symbols-outlined text-[16px]">menu_book</span>
+              E-Modul
+            </span>
+            <span className="text-outline-variant">/</span>
+            <span className="hover:text-on-surface transition-colors">{currentModule.category}</span>
+            <span className="text-outline-variant">/</span>
+            <span className="text-primary font-medium">{currentModule.title.split('—')[0].trim()}</span>
           </div>
+        </div>
+      </section>
 
-          <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+      {/* Main E-Modul Workbench */}
+      <div className="w-full px-gutter lg:px-gutter-lg py-space-lg">
+        <div className="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+          
+          {/* LEFT SIDEBAR: Daftar Isi & Progress */}
+          <aside className="lg:col-span-3 flex flex-col gap-6 lg:sticky top-24 hidden lg:flex">
+            {/* Progress Card */}
+            <div className="p-space-md bg-surface-container-low rounded-lg shadow-sm border border-outline-variant/10 flex flex-col gap-space-sm">
+              <div className="flex items-center justify-between">
+                <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Progress Membaca</span>
+                <span className="font-code-sm text-code-sm text-primary font-bold">{progressPercent}%</span>
+              </div>
+              <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
+                <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${progressPercent}%` }}></div>
+              </div>
+              <p className="font-code-sm text-code-sm text-on-surface-variant">Halaman {activeTopicIndex + 1} dari {currentModule.topics.length}</p>
+            </div>
+
+            {/* Navigation Menu (Daftar Isi) */}
+            <nav aria-label="Daftar Isi Modul" className="flex flex-col gap-1 p-2 bg-surface-container-lowest rounded-lg shadow-sm border border-outline-variant/10">
+              <h3 className="font-headline-sm text-xs text-on-surface-variant font-bold uppercase tracking-wider px-3 py-2 border-b border-outline-variant/10 mb-2">
+                Daftar Isi
+              </h3>
+              {currentModule.topics.map((topic, idx) => {
+                const isActive = activeTopicIndex === idx;
+                const isPassed = activeTopicIndex > idx;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveTopicIndex(idx)}
+                    className={`group flex items-center justify-between px-3 py-2.5 rounded transition-all text-left ${isActive ? 'bg-primary-container text-on-primary-container font-semibold shadow-sm' : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'}`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-primary' : isPassed ? 'bg-secondary' : 'bg-outline-variant'}`}></span>
+                      <span className="font-body-sm text-[0.85rem] leading-snug">{topic.title}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </nav>
+            
+            {/* CTA Simulasi Lab */}
             <button
               onClick={() => onNavigateToSim(currentModule.id)}
-              className="btn-primary"
-              style={{ width: '100%', justifyContent: 'center', fontSize: '0.88rem' }}
+              className="flex items-center justify-center gap-2 p-3 w-full bg-surface-container hover:bg-surface-container-high border border-outline-variant/20 rounded-lg transition-colors group shadow-sm text-left"
             >
-              <Play size={16} /> Ke Simulasi Interaktif
+               <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors shrink-0">
+                 <span className="material-symbols-outlined">experiment</span>
+               </div>
+               <div className="flex flex-col">
+                 <span className="font-label-sm text-xs text-on-surface-variant uppercase tracking-widest">Aksi</span>
+                 <span className="font-body-sm font-semibold text-on-surface group-hover:text-primary transition-colors">Buka Image Lab</span>
+               </div>
             </button>
-          </div>
-        </div>
+          </aside>
 
-        {/* Main Content Article */}
-        <div className="glass-panel" style={{ padding: '32px' }}>
-
-          {/* Learning Goal Section */}
-          {currentTopic.learningGoal && (
-            <div style={{
-              background: 'rgba(139, 92, 246, 0.08)',
-              border: '1px solid rgba(139, 92, 246, 0.25)',
-              padding: '14px 18px',
-              borderRadius: '10px',
-              marginBottom: '24px',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '12px'
-            }}>
-              <Target style={{ color: 'var(--accent-purple)', flexShrink: 0, marginTop: '2px' }} size={20} />
-              <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent-purple)', textTransform: 'uppercase', marginBottom: '2px' }}>
-                  Tujuan Pembelajaran Topik
+          {/* MAIN COLUMN: Flipbook Reading Experience */}
+          <main className="lg:col-span-9 flex flex-col w-full bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/10 overflow-hidden relative">
+            
+            {/* Page Header Area */}
+            <header className="p-8 md:p-12 pb-6 border-b border-outline-variant/10 bg-gradient-to-b from-surface-container-low to-surface-container-lowest">
+              <div className="flex flex-col gap-4">
+                <span className="font-label-md text-primary font-bold uppercase tracking-widest flex items-center gap-2">
+                  <span className="w-8 h-[2px] bg-primary rounded-full"></span>
+                  Halaman {activeTopicIndex + 1}
+                </span>
+                <h1 className="font-display-sm md:font-display-md text-on-surface font-extrabold leading-tight tracking-tight">
+                  {currentTopic.title}
+                </h1>
+                
+                {/* Audio Narration Component */}
+                {currentTopic.audioUrl && (
+                  <AudioPlayer src={currentTopic.audioUrl} />
+                )}
+              </div>
+            </header>
+            
+            {/* Page Content Body */}
+            <article className="p-8 md:p-12 pt-6 min-h-[400px]">
+              
+              {/* Learning Goal Callout (Optional) */}
+              {currentTopic.learningGoal && (
+                <div className="mb-8 p-4 bg-primary/5 rounded-lg border-l-4 border-primary flex gap-4 items-start">
+                   <span className="material-symbols-outlined text-primary text-xl shrink-0 mt-0.5">lightbulb</span>
+                   <p className="font-body-md text-on-surface font-medium italic">
+                     {currentTopic.learningGoal}
+                   </p>
                 </div>
-                <div style={{ fontSize: '0.92rem', color: '#e0e7ff', lineHeight: 1.5 }}>
-                  {currentTopic.learningGoal}
+              )}
+
+              <TextRenderer content={currentTopic.content} />
+              
+              {/* Observation Points Checklist */}
+              {currentTopic.observationPoints && currentTopic.observationPoints.length > 0 && (
+                <div className="mt-10 p-6 bg-surface-container-low rounded-xl border border-outline-variant/10">
+                  <h3 className="font-headline-sm text-on-surface font-bold uppercase tracking-wide mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-secondary">visibility</span>
+                    Poin Pengamatan Simulasi
+                  </h3>
+                  <ul className="space-y-3">
+                    {currentTopic.observationPoints.map((pt, idx) => (
+                      <li key={idx} className="flex items-start gap-3">
+                        <span className="w-1.5 h-1.5 mt-2 bg-secondary rounded-full shrink-0"></span>
+                        <span className="font-body-md text-on-surface">{pt}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              </div>
-            </div>
-          )}
+              )}
+            </article>
 
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '20px', color: 'var(--text-main)' }}>
-            {currentTopic.title}
-          </h2>
-
-          {/* Formatted Text Content */}
-          <div style={{ marginBottom: '30px' }}>
-            <TextRenderer content={currentTopic.content} />
-          </div>
-
-          {/* Observation Points Box (Yang Perlu Diamati) */}
-          {currentTopic.observationPoints && (
-            <div style={{
-              background: 'rgba(6, 182, 212, 0.08)',
-              border: '1px solid rgba(6, 182, 212, 0.25)',
-              padding: '18px 20px',
-              borderRadius: '12px',
-              marginBottom: '30px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', color: 'var(--accent-cyan)', fontWeight: 700, fontSize: '0.95rem' }}>
-                <Eye size={18} /> Yang Perlu Diamati Saat Simulasi:
-              </div>
-              <ul style={{ margin: 0, paddingLeft: '20px', color: '#cffafe', fontSize: '0.9rem', lineHeight: 1.7 }}>
-                {currentTopic.observationPoints.map((pt, pIdx) => (
-                  <li key={pIdx}>{pt}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* OpenCV Code Example */}
-          <div style={{ background: '#0d1117', padding: '20px', borderRadius: '12px', border: '1px solid var(--dark-border)', marginBottom: '30px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-purple)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Code size={16} /> Contoh Kode Penerapan (Python OpenCV)
-              </span>
-            </div>
-            <pre style={{ fontFamily: 'var(--font-code)', fontSize: '0.85rem', color: '#c9d1d9', overflowX: 'auto', margin: 0 }}>
-              <code>{currentModule.codeExample}</code>
-            </pre>
-          </div>
-
-          {/* Reflection Section */}
-          {currentModule.reflection && activeTopicIndex === currentModule.topics.length - 1 && (
-            <div style={{
-              background: 'rgba(245, 158, 11, 0.08)',
-              border: '1px solid rgba(245, 158, 11, 0.25)',
-              padding: '16px 20px',
-              borderRadius: '10px',
-              marginBottom: '30px'
-            }}>
-              <div style={{ fontWeight: 700, color: 'var(--warning)', fontSize: '0.9rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Sparkles size={16} /> Refleksi Pembelajaran:
-              </div>
-              <div style={{ fontSize: '0.9rem', color: '#fef08a', lineHeight: 1.6 }}>
-                {currentModule.reflection}
-              </div>
-            </div>
-          )}
-
-          {/* Navigation Controls */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-            {activeTopicIndex > 0 ? (
-              <button onClick={() => setActiveTopicIndex(prev => prev - 1)} className="btn-secondary" style={{ fontSize: '0.85rem' }}>
-                <ArrowLeft size={16} /> Topik Sebelumnya
+            {/* Flipbook Pagination Footer */}
+            <footer className="p-6 md:p-8 border-t border-outline-variant/10 bg-surface-container-low flex flex-col sm:flex-row items-center justify-between gap-4">
+              <button 
+                onClick={() => setActiveTopicIndex(prev => Math.max(0, prev - 1))}
+                disabled={activeTopicIndex === 0}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-container-high bg-surface-container shadow-sm border border-outline-variant/20 text-on-surface-variant hover:text-on-surface"
+              >
+                <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                <span>Halaman Sebelumnya</span>
               </button>
-            ) : <div />}
-
-            {activeTopicIndex < currentModule.topics.length - 1 ? (
-              <button onClick={() => setActiveTopicIndex(prev => prev + 1)} className="btn-secondary" style={{ fontSize: '0.85rem' }}>
-                Topik Selanjutnya <ChevronRight size={16} />
-              </button>
-            ) : (
-              <button onClick={() => onNavigateToSim(currentModule.id)} className="btn-primary" style={{ fontSize: '0.85rem' }}>
-                Mulai Simulasi Interaktif <Play size={16} />
-              </button>
-            )}
-          </div>
+              
+              <div className="font-code-sm font-medium text-on-surface-variant flex items-center gap-2">
+                <span>{activeTopicIndex + 1}</span>
+                <span className="text-outline-variant">/</span>
+                <span>{currentModule.topics.length}</span>
+              </div>
+              
+              {activeTopicIndex < currentModule.topics.length - 1 ? (
+                <button 
+                  onClick={() => setActiveTopicIndex(prev => prev + 1)}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm transition-all bg-primary text-on-primary hover:bg-primary/90 shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                >
+                  <span>Halaman Berikutnya</span>
+                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                </button>
+              ) : (
+                <button 
+                  onClick={() => onNavigateToSim(currentModule.id)}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm transition-all bg-secondary text-on-secondary hover:bg-secondary/90 shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                >
+                  <span className="material-symbols-outlined text-[18px]">experiment</span>
+                  <span>🔬 Coba di Image Lab</span>
+                </button>
+              )}
+            </footer>
+          </main>
 
         </div>
-
       </div>
     </div>
   );
